@@ -44,7 +44,7 @@ export function DashboardPage() {
   const [architectureDiagram, setArchitectureDiagram] = useState<string | null>(null);
   const [customAnswer, setCustomAnswer] = useState<string | null>(null);
 
-  const baseUrl = import.meta.env.VITE_AGENT_API_URL || "http://localhost:9000";
+  const baseUrl = import.meta.env.VITE_AGENT_API_URL || "https://softwaredebugger.onrender.com";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
