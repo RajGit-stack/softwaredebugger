@@ -180,32 +180,8 @@ export function DashboardPage() {
         {error && <p className="error">{error}</p>}
         {jobId && (
           <p className="success">
-            Job created with id <code>{jobId}</code>. Check the Jobs tab to follow progress.
+            Job created with id <code>{jobId}</code>. Go to the Jobs tab for the full analysis and results.
           </p>
-        )}
-        {result && (
-          <div className="analysis-panel">
-            <h2>Result preview</h2>
-            <pre>{result}</pre>
-          </div>
-        )}
-        {taskType === "repo_analyser" && architectureSummary && (
-          <div className="analysis-panel">
-            <h2>Repo architecture overview</h2>
-            <pre>{architectureSummary}</pre>
-          </div>
-        )}
-        {taskType === "repo_analyser" && architectureDiagram && (
-          <div className="analysis-panel">
-            <h2>High-level architecture diagram</h2>
-            <pre>{architectureDiagram}</pre>
-          </div>
-        )}
-        {customQuestion && customAnswer && (
-          <div className="analysis-panel">
-            <h2>Answer to your question</h2>
-            <pre>{customAnswer}</pre>
-          </div>
         )}
       </form>
     </div>
