@@ -2,6 +2,7 @@ from enum import Enum
 from uuid import uuid4
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .langgraph_graph import create_graph
@@ -34,6 +35,14 @@ class TaskResult(BaseModel):
 
 
 app = FastAPI(title="AI Software Debugger Agent Service")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # you can replace "*" with your Vercel URL for stricter security
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 graph = create_graph()
 
