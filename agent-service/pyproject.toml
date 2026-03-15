@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-service"
+version = "0.1.0"
+description = "FastAPI + LangGraph orchestrator for AI Software Debugger"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.29.0",
+    "langgraph>=0.2.0",
+    "langchain>=0.3.0",
+    "requests>=2.31.0",
+    "pydantic>=2.6.0",
+    "psycopg2-binary>=2.9.9",
+    "redis>=5.0.0",
+    "chromadb>=0.5.0",
+    "groq>=0.9.0",
+    "supabase-py>=2.4.0"
+]
+

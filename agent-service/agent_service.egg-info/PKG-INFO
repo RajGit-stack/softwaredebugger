@@ -1,0 +1,16 @@
+Metadata-Version: 2.4
+Name: agent-service
+Version: 0.1.0
+Summary: FastAPI + LangGraph orchestrator for AI Software Debugger
+Requires-Python: >=3.10
+Requires-Dist: fastapi>=0.115.0
+Requires-Dist: uvicorn[standard]>=0.29.0
+Requires-Dist: langgraph>=0.2.0
+Requires-Dist: langchain>=0.3.0
+Requires-Dist: requests>=2.31.0
+Requires-Dist: pydantic>=2.6.0
+Requires-Dist: psycopg2-binary>=2.9.9
+Requires-Dist: redis>=5.0.0
+Requires-Dist: chromadb>=0.5.0
+Requires-Dist: groq>=0.9.0
+Requires-Dist: supabase-py>=2.4.0
