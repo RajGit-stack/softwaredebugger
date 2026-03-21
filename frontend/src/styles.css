@@ -7,7 +7,11 @@
 body {
   margin: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
-  background: radial-gradient(circle at top left, #050816, #02010a 40%, #050816 80%);
+  background:
+    radial-gradient(circle at 10% 10%, rgba(56, 189, 248, 0.15), transparent 30%),
+    radial-gradient(circle at 90% 15%, rgba(34, 197, 94, 0.12), transparent 30%),
+    radial-gradient(circle at 50% 85%, rgba(129, 140, 248, 0.12), transparent 35%),
+    radial-gradient(circle at top left, #111836, #0f0b2d 40%, #111b48 80%);
   color: #f9fafb;
 }
 
@@ -82,10 +86,11 @@ body {
   background: radial-gradient(circle at top left, #020617, #020617 40%, #030712 100%);
   border-radius: 1.25rem;
   padding: 1.8rem 1.7rem;
-  border: 1px solid rgba(148, 163, 184, 0.3);
+  border: 1px solid rgba(59, 130, 246, 0.28);
   box-shadow:
     0 18px 45px rgba(15, 23, 42, 0.9),
-    0 0 0 1px rgba(15, 23, 42, 0.8);
+    0 0 0 1px rgba(15, 23, 42, 0.8),
+    inset 0 1px 0 rgba(148, 163, 184, 0.15);
 }
 
 .card h1 {
@@ -113,12 +118,48 @@ body {
   color: #d1d5db;
 }
 
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.checkbox-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
+
+.checkbox-row label {
+  display: inline;
+  color: #d1d5db;
+}
+
+.radio-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.radio-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.55rem;
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  border-radius: 0.55rem;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.72), rgba(30, 41, 59, 0.52));
+}
+
+.radio-row input[type="radio"] {
+  accent-color: #38bdf8;
+}
+
 .form input,
 .form select,
 .form textarea {
-  background: rgba(15, 23, 42, 0.75);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.86), rgba(30, 41, 59, 0.72));
   border-radius: 0.65rem;
-  border: 1px solid rgba(148, 163, 184, 0.5);
+  border: 1px solid rgba(56, 189, 248, 0.4);
   padding: 0.6rem 0.7rem;
   font: inherit;
   color: #e5e7eb;
@@ -129,8 +170,8 @@ body {
 .form input:focus,
 .form select:focus,
 .form textarea:focus {
-  border-color: #22c55e;
-  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.6);
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.75), 0 0 18px rgba(56, 189, 248, 0.2);
   background: rgba(15, 23, 42, 0.95);
 }
 
@@ -180,6 +221,33 @@ body {
   margin-top: 0.6rem;
   color: #bbf7d0;
   font-size: 0.85rem;
+  background: linear-gradient(90deg, rgba(22, 163, 74, 0.18), rgba(6, 182, 212, 0.14));
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  border-radius: 0.6rem;
+  padding: 0.6rem 0.7rem;
+}
+
+.status-panel {
+  margin-top: 0.9rem;
+  padding: 0.8rem;
+  border-radius: 0.8rem;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.55), rgba(17, 24, 39, 0.8));
+}
+
+.status-panel h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+  color: #c4b5fd;
+}
+
+.file-list {
+  margin: 0.45rem 0 0;
+  padding-left: 1rem;
+}
+
+.file-list li {
+  margin-bottom: 0.3rem;
 }
 
 .analysis-panel {

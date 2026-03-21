@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from .langgraph_graph import create_graph
+from .langgraph_graph import create_graph, get_read_plan
 
 
 class TaskType(str, Enum):
@@ -22,6 +22,9 @@ class CreateTaskBody(BaseModel):
     branch: str = "main"
     description: str | None = None
     custom_question: str | None = None
+    allow_file_read: bool = False
+    target_file_path: str | None = None
+    allow_full_repo_read: bool = False
 
 
 class TaskResult(BaseModel):
@@ -32,6 +35,19 @@ class TaskResult(BaseModel):
     architecture_summary: str
     architecture_diagram: str
     custom_answer: str
+    read_files: list[str]
+
+
+class ReadPlanRequest(BaseModel):
+    repo_url: str
+    branch: str = "main"
+    allow_file_read: bool = False
+    target_file_path: str | None = None
+    allow_full_repo_read: bool = False
+
+
+class ReadPlanResponse(BaseModel):
+    read_files: list[str]
 
 
 app = FastAPI(title="AI Software Debugger Agent Service")
@@ -56,12 +72,18 @@ async def create_task(body: CreateTaskBody) -> TaskResult:
             "branch": body.branch,
             "description": body.description or "",
             "custom_question": body.custom_question or "",
+            "allow_file_read": body.allow_file_read,
+            "target_file_path": body.target_file_path or "",
+            "allow_full_repo_read": body.allow_full_repo_read,
             "result": "",
             "quality_score": 0.0,
             "repo_overview": "",
             "architecture_summary": "",
             "architecture_diagram": "",
             "custom_answer": "",
+            "repo_full_context": "",
+            "target_file_content": "",
+            "read_files": [],
         }
     )
     return TaskResult(
@@ -72,4 +94,17 @@ async def create_task(body: CreateTaskBody) -> TaskResult:
         architecture_summary=state.get("architecture_summary", ""),
         architecture_diagram=state.get("architecture_diagram", ""),
         custom_answer=state.get("custom_answer", ""),
+        read_files=state.get("read_files", []),
     )
+
+
+@app.post("/repos/read-plan", response_model=ReadPlanResponse)
+async def read_plan(body: ReadPlanRequest) -> ReadPlanResponse:
+    files = get_read_plan(
+        repo_url=body.repo_url,
+        branch=body.branch,
+        allow_file_read=body.allow_file_read,
+        target_file_path=body.target_file_path or "",
+        allow_full_repo_read=body.allow_full_repo_read,
+    )
+    return ReadPlanResponse(read_files=files)

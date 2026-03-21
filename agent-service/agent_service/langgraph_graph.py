@@ -13,12 +13,18 @@ class GraphState(TypedDict):
     branch: str
     description: str
     custom_question: str
+    allow_file_read: bool
+    target_file_path: str
+    allow_full_repo_read: bool
     result: str
     quality_score: float
     repo_overview: str
+    repo_full_context: str
+    read_files: list[str]
     architecture_summary: str
     architecture_diagram: str
     custom_answer: str
+    target_file_content: str
 
 
 def _get_groq_client() -> Groq:
@@ -103,10 +109,167 @@ def _fetch_repo_overview(repo_url: str, branch: str) -> str:
         return ""
 
 
+def _fetch_file_content(repo_url: str, branch: str, file_path: str) -> str:
+    owner, repo = _parse_github_repo(repo_url)
+    if not owner or not repo or not file_path:
+        return ""
+
+    safe_path = file_path.lstrip("/")
+    url = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{safe_path}"
+    try:
+        resp = requests.get(url, timeout=20)
+        if resp.ok:
+            return resp.text[:25000]
+        return ""
+    except Exception:
+        return ""
+
+
+def _get_repo_candidate_paths(
+    repo_url: str,
+    branch: str,
+    max_files: int = 20,
+) -> list[str]:
+    owner, repo = _parse_github_repo(repo_url)
+    if not owner or not repo:
+        return []
+
+    headers: dict[str, str] = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "ai-software-debugger-agent",
+    }
+    token = os.environ.get("GITHUB_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    try:
+        tree_resp = requests.get(
+            f"https://api.github.com/repos/{owner}/{repo}/git/trees/{branch}",
+            params={"recursive": "1"},
+            headers=headers,
+            timeout=20,
+        )
+        if not tree_resp.ok:
+            return []
+        entries = tree_resp.json().get("tree", [])
+        candidate_ext = (
+            ".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".go", ".rs", ".rb", ".php", ".cs",
+            ".json", ".yml", ".yaml", ".toml", ".md", ".sql", ".sh"
+        )
+        selected_paths: list[str] = []
+        for e in entries:
+            if e.get("type") != "blob":
+                continue
+            path = e.get("path", "")
+            if not path:
+                continue
+            low = path.lower()
+            if any(x in low for x in ("node_modules/", ".git/", "dist/", "build/", ".next/")):
+                continue
+            if low.endswith(candidate_ext):
+                selected_paths.append(path)
+            if len(selected_paths) >= max_files:
+                break
+        return selected_paths
+    except Exception:
+        return []
+
+
+def get_read_plan(
+    repo_url: str,
+    branch: str,
+    allow_file_read: bool,
+    target_file_path: str,
+    allow_full_repo_read: bool,
+) -> list[str]:
+    if allow_full_repo_read:
+        return _get_repo_candidate_paths(repo_url, branch, max_files=20)
+    if allow_file_read and target_file_path:
+        return [target_file_path.lstrip("/")]
+    return []
+
+
+def _fetch_repo_files_content(
+    repo_url: str,
+    branch: str,
+    max_files: int = 20,
+    max_file_chars: int = 5000,
+    max_total_chars: int = 40000,
+) -> tuple[str, list[str]]:
+    owner, repo = _parse_github_repo(repo_url)
+    if not owner or not repo:
+        return "", []
+
+    try:
+        selected_paths = _get_repo_candidate_paths(repo_url, branch, max_files=max_files)
+
+        chunks: list[str] = []
+        total = 0
+        for path in selected_paths:
+            raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}"
+            resp = requests.get(raw_url, timeout=20)
+            if not resp.ok:
+                continue
+            text = resp.text[:max_file_chars]
+            block = f"FILE: {path}\n{text}\n"
+            if total + len(block) > max_total_chars:
+                break
+            chunks.append(block)
+            total += len(block)
+        return "\n\n".join(chunks), selected_paths
+    except Exception:
+        return "", []
+
+
+def _target_file_context(state: GraphState) -> str:
+    if not state.get("allow_file_read"):
+        return "Target file read: NOT ALLOWED by user permission."
+    if not state.get("target_file_path"):
+        return "Target file read: ALLOWED, but no file path provided."
+    content = state.get("target_file_content", "")
+    if not content:
+        return (
+            f"Target file read: ALLOWED for '{state['target_file_path']}', "
+            "but file could not be fetched (path/branch/repo may be wrong)."
+        )
+    return (
+        f"Target file read: ALLOWED.\n"
+        f"FILE: {state['target_file_path']}\n\n"
+        f"FILE CONTENT (truncated):\n{content}"
+    )
+
+
+def _full_repo_context(state: GraphState) -> str:
+    if not state.get("allow_full_repo_read"):
+        return "Full repository read: NOT ALLOWED by user permission."
+    content = state.get("repo_full_context", "")
+    if not content:
+        return "Full repository read: ALLOWED, but files could not be fetched."
+    return f"Full repository read: ALLOWED.\n\nREPO FILE CONTENT SNAPSHOT:\n{content}"
+
+
 def supervisor(state: GraphState) -> GraphState:
     # Attach lightweight repo overview (tree + README) so downstream agents can "see" the code.
     overview = _fetch_repo_overview(state["repo_url"], state["branch"])
     state["repo_overview"] = overview
+    state["target_file_content"] = ""
+    if state.get("allow_file_read") and state.get("target_file_path"):
+        state["target_file_content"] = _fetch_file_content(
+            state["repo_url"],
+            state["branch"],
+            state["target_file_path"],
+        )
+    state["repo_full_context"] = ""
+    state["read_files"] = []
+    if state.get("allow_full_repo_read"):
+        content, paths = _fetch_repo_files_content(
+            state["repo_url"],
+            state["branch"],
+        )
+        state["repo_full_context"] = content
+        state["read_files"] = paths
+    elif state.get("allow_file_read") and state.get("target_file_path"):
+        state["read_files"] = [state["target_file_path"].lstrip("/")]
     return state
 
 
@@ -117,6 +280,8 @@ def repo_analyser_agent(state: GraphState) -> GraphState:
         f"User description: {state['description']}\n\n"
         "You are given a partial view of the repository (tree + README):\n\n"
         f"{state.get('repo_overview','')}\n\n"
+        f"{_target_file_context(state)}\n\n"
+        f"{_full_repo_context(state)}\n\n"
         "From this, describe the code architecture and flow:\n"
         "- What the project does overall\n"
         "- Main modules / layers and how they interact\n"
@@ -138,6 +303,8 @@ def repo_analyser_agent(state: GraphState) -> GraphState:
         "Do NOT add explanations, only the diagram lines.",
         f"Repository URL: {state['repo_url']}\nBranch: {state['branch']}\n\n"
         f"REPO OVERVIEW:\n{state.get('repo_overview','')}\n\n"
+        f"{_target_file_context(state)}\n\n"
+        f"{_full_repo_context(state)}\n\n"
         "Create a high-level architecture / data-flow diagram for this project.",
     )
     state["architecture_diagram"] = diagram
@@ -147,6 +314,8 @@ def repo_analyser_agent(state: GraphState) -> GraphState:
             "You answer specific developer questions about a codebase, using the repository structure and README as context.",
             f"Repository URL: {state['repo_url']}\nBranch: {state['branch']}\n\n"
             f"REPO OVERVIEW:\n{state.get('repo_overview','')}\n\n"
+            f"{_target_file_context(state)}\n\n"
+            f"{_full_repo_context(state)}\n\n"
             f"QUESTION:\n{state['custom_question']}",
         )
         state["custom_answer"] = qa
@@ -161,6 +330,8 @@ def bug_fixer_agent(state: GraphState) -> GraphState:
         f"User description (bugs/issues): {state['description']}\n\n"
         "You are given a partial view of the repository (tree + README):\n\n"
         f"{state.get('repo_overview','')}\n\n"
+        f"{_target_file_context(state)}\n\n"
+        f"{_full_repo_context(state)}\n\n"
         "Use this structure to ground your reasoning. "
         "For each proposed bug, return a markdown section with:\n"
         "- A plausible file path and area (based on the tree)\n"
@@ -179,6 +350,8 @@ def bug_fixer_agent(state: GraphState) -> GraphState:
             "You answer specific debugging questions about a codebase, using the repository structure and README as context.",
             f"Repository URL: {state['repo_url']}\nBranch: {state['branch']}\n\n"
             f"REPO OVERVIEW:\n{state.get('repo_overview','')}\n\n"
+            f"{_target_file_context(state)}\n\n"
+            f"{_full_repo_context(state)}\n\n"
             f"QUESTION:\n{state['custom_question']}",
         )
         state["custom_answer"] = qa
@@ -193,6 +366,8 @@ def test_generator_agent(state: GraphState) -> GraphState:
         f"User description: {state['description']}\n\n"
         "You are given a partial view of the repository (tree + README):\n\n"
         f"{state.get('repo_overview','')}\n\n"
+        f"{_target_file_context(state)}\n\n"
+        f"{_full_repo_context(state)}\n\n"
         "Identify the main language and testing framework if possible. "
         "Generate real test code (not just descriptions) for the key functions implied by the structure or mentioned above. "
         "Return copy-pasteable test code blocks grouped by file."
@@ -209,6 +384,8 @@ def test_generator_agent(state: GraphState) -> GraphState:
             "You answer questions about testing strategies for a codebase, using the repository structure and README as context.",
             f"Repository URL: {state['repo_url']}\nBranch: {state['branch']}\n\n"
             f"REPO OVERVIEW:\n{state.get('repo_overview','')}\n\n"
+            f"{_target_file_context(state)}\n\n"
+            f"{_full_repo_context(state)}\n\n"
             f"QUESTION:\n{state['custom_question']}",
         )
         state["custom_answer"] = qa
@@ -223,6 +400,8 @@ def doc_generator_agent(state: GraphState) -> GraphState:
         f"User description: {state['description']}\n\n"
         "You are given a partial view of the repository (tree + README):\n\n"
         f"{state.get('repo_overview','')}\n\n"
+        f"{_target_file_context(state)}\n\n"
+        f"{_full_repo_context(state)}\n\n"
         "Write README-style documentation that explains:\n"
         "- What the project does\n"
         "- How it is structured\n"
@@ -240,6 +419,8 @@ def doc_generator_agent(state: GraphState) -> GraphState:
             "You answer documentation-related questions about a codebase, using the repository structure and README as context.",
             f"Repository URL: {state['repo_url']}\nBranch: {state['branch']}\n\n"
             f"REPO OVERVIEW:\n{state.get('repo_overview','')}\n\n"
+            f"{_target_file_context(state)}\n\n"
+            f"{_full_repo_context(state)}\n\n"
             f"QUESTION:\n{state['custom_question']}",
         )
         state["custom_answer"] = qa
@@ -255,6 +436,8 @@ def code_search_agent(state: GraphState) -> GraphState:
         f"Code search query: {query}\n\n"
         "You are given a partial view of the repository (tree + README):\n\n"
         f"{state.get('repo_overview','')}\n\n"
+        f"{_target_file_context(state)}\n\n"
+        f"{_full_repo_context(state)}\n\n"
         "Act as an AI code search assistant. "
         "Based on the tree and README, identify the most relevant files and directories for this query. "
         "Return markdown with:\n"
